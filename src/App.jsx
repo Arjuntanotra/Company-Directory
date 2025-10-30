@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2 } from 'lucide-react';
 
-// PASTE YOUR WEB APP URL HERE
+
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5SJm00xKHTIShxzrl7VKj4KadjtaInTM_T97JNiJTm7d6WJH68zd1Tt5k4x36W9Qg/exec';
 const ADMIN_PASSWORDS = process.env.REACT_APP_ADMIN_PASSWORDS
   ? process.env.REACT_APP_ADMIN_PASSWORDS.split(',')
