@@ -3,7 +3,9 @@ import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2 } f
 
 // PASTE YOUR WEB APP URL HERE
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5SJm00xKHTIShxzrl7VKj4KadjtaInTM_T97JNiJTm7d6WJH68zd1Tt5k4x36W9Qg/exec';
-const ADMIN_PASSWORDS = ['admin123', 'admin456', 'admin789'];
+const ADMIN_PASSWORDS = process.env.REACT_APP_ADMIN_PASSWORDS
+  ? process.env.REACT_APP_ADMIN_PASSWORDS.split(',')
+  : [];
 
 function App() {
   const [data, setData] = useState([]);
