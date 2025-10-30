@@ -196,7 +196,7 @@ function App() {
           {isAdmin && (
             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-800">
-                <strong>✅ Admin Mode:</strong> Changes will be saved directly to Google Sheet!
+                <strong>✅ Admin Mode</strong> 
               </p>
             </div>
           )}
