@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -16,7 +16,10 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [form, setForm] = useState({ location: '', extension: '', username: '' });
+  const [visibleItems, setVisibleItems] = useState(25); // Start with 25 items
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fileRef = useRef();
+  const observerRef = useRef();
 
   // Load data from Google Sheets via Apps Script
   const loadData = async () => {
@@ -45,6 +48,44 @@ function App() {
   String(e.extension || '').toLowerCase().includes(search.toLowerCase()) ||
   String(e.location || '').toLowerCase().includes(search.toLowerCase())
 );
+
+  // Reset visible items when search changes
+  useEffect(() => {
+    setVisibleItems(25);
+  }, [search]);
+
+  // Infinite scroll logic
+  const loadMoreItems = useCallback(() => {
+    if (isLoadingMore || visibleItems >= filtered.length) return;
+
+    setIsLoadingMore(true);
+    setTimeout(() => {
+      setVisibleItems(prev => Math.min(prev + 25, filtered.length));
+      setIsLoadingMore(false);
+    }, 500); // Small delay for smooth UX
+  }, [isLoadingMore, visibleItems, filtered.length]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleItems < filtered.length) {
+          loadMoreItems();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
+      }
+    };
+  }, [loadMoreItems, visibleItems, filtered.length]);
 
 
   // Admin login
@@ -367,7 +408,7 @@ function App() {
 
         {/* Employee Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map((entry, idx) => (
+          {(search ? filtered : filtered.slice(0, visibleItems)).map((entry, idx) => (
             <div key={idx} className="bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-2xl transition-all duration-300 group overflow-hidden">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
@@ -431,6 +472,29 @@ function App() {
             </div>
           ))}
         </div>
+
+        {/* Infinite Scroll Trigger */}
+        {visibleItems < filtered.length && (
+          <div ref={observerRef} className="flex justify-center py-8">
+            <div className="flex items-center gap-3 text-slate-500">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-300 border-t-slate-600"></div>
+              <span className="text-sm font-medium">Loading more employees...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Load More Button (Fallback) */}
+        {visibleItems < filtered.length && (
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={loadMoreItems}
+              disabled={isLoadingMore}
+              className="px-8 py-3 bg-slate-600 text-white rounded-xl hover:bg-slate-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50"
+            >
+              {isLoadingMore ? 'Loading...' : `Load More (${filtered.length - visibleItems} remaining)`}
+            </button>
+          </div>
+        )}
 
         {filtered.length === 0 && (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-16 text-center">
@@ -519,13 +583,19 @@ function App() {
         <footer className="mt-16 py-8 border-t border-slate-200">
           <div className="text-center">
             <p className="text-slate-500 text-sm">
-              © 2025 Rashmi Metaliks Limited. Developed by Arjun Tanotra.
-            </p>
-            <p className="text-slate-400 text-xs mt-1">
-              Employee Directory System
+              © 2025 Rashmi Metaliks Limited. Enterprise Employee Directory System
             </p>
           </div>
         </footer>
+
+        {/* Watermark */}
+        <div className="fixed bottom-6 right-8 pointer-events-none select-none z-10">
+          <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-lg border border-slate-200">
+            <div className="text-slate-600 text-sm font-semibold">
+              Developed by Arjun Tanotra
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
