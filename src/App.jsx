@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5SJm00xKHTIShxzrl7VKj4KadjtaInTM_T97JNiJTm7d6WJH68zd1Tt5k4x36W9Qg/exec';
@@ -15,6 +16,7 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [form, setForm] = useState({ location: '', extension: '', username: '' });
+  const fileRef = useRef();
 
   // Load data from Google Sheets via Apps Script
   const loadData = async () => {
@@ -163,208 +165,367 @@ function App() {
     setShowModal(true);
   };
 
+  // Handle file upload
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const data = evt.target.result;
+      const workbook = XLSX.read(data, {type: 'binary'});
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonArray = XLSX.utils.sheet_to_json(worksheet);
+
+      // Log the actual column names found in the file
+      if (jsonArray.length > 0) {
+        const columnNames = Object.keys(jsonArray[0]);
+        console.log('Column names found in file:', columnNames);
+      }
+
+      const filteredData = jsonArray.map(row => ({
+        location: String(row.location || row.Location || row.loc || row.Loc || '').trim(),
+        extension: String(row.extension || row.Extension || row.ext || row.Ext || row['Extension number'] || '').trim(),
+        username: String(row.username || row.Username || row.name || row.Name || row.employee || row.Employee || row['User name'] || '').trim(),
+      })).filter(entry => entry.username && entry.extension); // Basic validation: require username and extension
+
+      console.log('Original data rows:', jsonArray.length);
+      console.log('Filtered valid rows:', filteredData.length);
+      console.log('Sample row mappings:', jsonArray.slice(0, 3).map(row => ({
+        original: row,
+        mapped: {
+          location: String(row.location || row.Location || row.loc || row.Loc || '').trim(),
+          extension: String(row.extension || row.Extension || row.ext || row.Ext || '').trim(),
+          username: String(row.username || row.Username || row.name || row.Name || row.employee || row.Employee || '').trim(),
+        }
+      })));
+
+      if (filteredData.length === 0) {
+        alert('No valid data found in the file. Ensure columns contain username/name, extension/ext, and location data. Supported column names: username/name/employee/"User name", extension/ext/"Extension number", location/loc');
+        return;
+      }
+
+      const confirm = window.confirm(`Import ${filteredData.length} entries?`);
+      if (confirm) {
+        bulkUpload(filteredData);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Bulk upload function - optimized for speed
+  const bulkUpload = async (entries) => {
+    setLoading(true);
+    let successCount = 0;
+    let failCount = 0;
+    const batchSize = 10; // Process 10 entries at a time
+
+    // Process entries in batches
+    for (let i = 0; i < entries.length; i += batchSize) {
+      const batch = entries.slice(i, i + batchSize);
+      const batchPromises = batch.map(entry => {
+        const formData = new URLSearchParams();
+        formData.append('action', 'add');
+        formData.append('location', entry.location);
+        formData.append('extension', entry.extension);
+        formData.append('username', entry.username);
+
+        return fetch(WEB_APP_URL, { method: 'POST', body: formData })
+          .then(res => res.json())
+          .then(result => result.success ? 1 : 0)
+          .catch(() => 0);
+      });
+
+      // Wait for all requests in this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      successCount += batchResults.filter(result => result === 1).length;
+      failCount += batchResults.filter(result => result === 0).length;
+    }
+
+    setLoading(false);
+    loadData();
+    alert(`Bulk upload completed!\nAdded: ${successCount}\nSkipped/Failed: ${failCount}`);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50">
+      <div className="max-w-[95vw] mx-auto px-6 py-8">
+
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 mb-8">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Rashmi Metaliks Limited's Directory</h1>
-              <p className="text-gray-600">Quick access to employee</p>
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-2xl">R</span>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Rashmi Metaliks Limited</h1>
+                <p className="text-slate-600 text-lg font-medium">Employee Directory</p>
+                <p className="text-slate-500 text-sm mt-1">Access to company contacts and extensions</p>
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <button
                 onClick={loadData}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                className="px-6 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
-                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                Refresh
+                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                Refresh Data
               </button>
               <button
                 onClick={() => isAdmin ? setIsAdmin(false) : handleAdminLogin()}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                  isAdmin ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'
+                className={`px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
+                  isAdmin ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-700 text-white hover:bg-slate-800'
                 }`}
               >
-                {isAdmin ? <Unlock size={18} /> : <Lock size={18} />}
-                {isAdmin ? 'Admin' : 'User'}
+                {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
+                {isAdmin ? 'Admin Active' : 'Admin Login'}
               </button>
             </div>
           </div>
 
           {isAdmin && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
-                <strong>✅ Admin Mode</strong> 
-              </p>
+            <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                <p className="text-emerald-800 font-semibold">
+                  Administrative Access Enabled
+                </p>
+                <span className="text-emerald-600 text-sm">Full system management capabilities active</span>
+              </div>
             </div>
           )}
         </div>
 
         {/* Search Bar */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search by name, extension, or location..."
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 mb-8">
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-3">Search Directory</label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={22} />
+                <input
+                  type="text"
+                  placeholder="Search employees by name, extension, or location..."
+                  className="w-full pl-12 pr-4 py-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-slate-800 placeholder-slate-400"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
             {isAdmin && (
+              <div className="flex flex-col sm:flex-row gap-4 lg:min-w-fit">
+                <button
+                  onClick={() => {
+                    setShowModal(true);
+                    setEditingIndex(null);
+                    setForm({ location: '', extension: '', username: '' });
+                  }}
+                  className="px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
+                >
+                  <Plus size={20} />
+                  Add Employee
+                </button>
+                <button
+                  onClick={() => fileRef.current.click()}
+                  className="px-6 py-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
+                >
+                  <Upload size={20} />
+                  Bulk Import
+                </button>
+                <input
+                  type="file"
+                  ref={fileRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                  accept=".xlsx,.xls,.csv"
+                />
+              </div>
+            )}
+          </div>
+          <div className="mt-6 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-4">
+              <span className="text-slate-600 font-medium">
+                Total Employees: <span className="text-slate-800 font-bold">{data.length}</span>
+              </span>
+              <span className="text-slate-600 font-medium">
+                Showing: <span className="text-slate-800 font-bold">{filtered.length}</span>
+              </span>
+            </div>
+            {search && (
               <button
-                onClick={() => { 
-                  setShowModal(true); 
-                  setEditingIndex(null); 
-                  setForm({ location: '', extension: '', username: '' }); 
-                }}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                onClick={() => setSearch('')}
+                className="text-slate-500 hover:text-slate-700 font-medium transition-colors"
               >
-                <Plus size={20} />
-                Add
+                Clear search
               </button>
             )}
           </div>
-          <p className="mt-3 text-sm text-gray-600">
-            Showing {filtered.length} of {data.length} contacts
-          </p>
         </div>
 
-        {/* Contact Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Employee Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filtered.map((entry, idx) => (
-            <div key={idx} className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-2xl hover:scale-105 transition-all duration-300 group">
-              <div className="flex justify-between items-start mb-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
-                    {entry.username.charAt(0).toUpperCase()}
+            <div key={idx} className="bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                      {entry.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-xl text-slate-800 leading-tight">{entry.username}</h3>
+                      <p className="text-slate-500 font-medium">Employee</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-gray-800">{entry.username}</h3>
-                    <p className="text-sm text-gray-500">Employee</p>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={() => openEdit(entry)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Employee"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(entry.index)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remove Employee"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {isAdmin && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openEdit(entry)}
-                      className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(entry.index)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                )}
-              </div>
 
-              <div className="space-y-4">
-                <a
-                  href={`tel:${entry.extension}`}
-                  className="block"
-                >
-                  <div className="flex items-center gap-4 bg-blue-50 p-4 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors cursor-pointer group">
-                    <Phone size={20} className="text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="text-xs text-blue-700 font-medium">Extension</div>
-                      <div className="font-mono font-bold text-xl text-blue-800">{entry.extension}</div>
+                <div className="space-y-4">
+                  <a
+                    href={`tel:${entry.extension}`}
+                    className="block group/contact"
+                  >
+                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200 cursor-pointer">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover/contact:bg-blue-200 transition-colors">
+                        <Phone size={20} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Extension</div>
+                        <div className="font-mono font-bold text-xl text-slate-800">{entry.extension}</div>
+                      </div>
                     </div>
-                  </div>
-                </a>
-                {entry.location && (
-                  <div className="flex items-center gap-4 bg-green-50 p-4 rounded-xl border border-green-100">
-                    <MapPin size={20} className="text-green-600 flex-shrink-0" />
-                    <div>
-                      <div className="text-xs text-green-700 font-medium">Location</div>
-                      <div className="text-sm font-semibold text-green-800">{entry.location}</div>
+                  </a>
+                  {entry.location && (
+                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <MapPin size={20} className="text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Location</div>
+                        <div className="text-sm font-semibold text-slate-800">{entry.location}</div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
 
         {filtered.length === 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <p className="text-gray-500">No results found</p>
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-16 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search size={32} className="text-slate-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-800 mb-2">No employees found</h3>
+            <p className="text-slate-500">Try adjusting your search criteria or clear the search to see all employees.</p>
           </div>
         )}
 
         {/* Add/Edit Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-              <h2 className="text-2xl font-bold mb-6">
-                {editingIndex !== null ? 'Edit Entry' : 'Add New Entry'}
-              </h2>
-              <div className="space-y-4">
+          <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-lg w-full border border-slate-200">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center">
+                  <Plus size={24} className="text-white" />
+                </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Location</label>
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    {editingIndex !== null ? 'Edit Employee' : 'Add New Employee'}
+                  </h2>
+                  <p className="text-slate-500 text-sm">
+                    {editingIndex !== null ? 'Update employee information' : 'Enter new employee details'}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">Employee Name</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 border rounded-lg"
-                    value={form.location}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    placeholder="e.g., A13, Office"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    value={form.username}
+                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    placeholder="e.g., John Doe"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Extension</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">Extension Number</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 border rounded-lg"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     value={form.extension}
                     onChange={(e) => setForm({ ...form, extension: e.target.value })}
                     placeholder="e.g., 701"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Name</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">Location</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 border rounded-lg"
-                    value={form.username}
-                    onChange={(e) => setForm({ ...form, username: e.target.value })}
-                    placeholder="e.g., John Doe"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    value={form.location}
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
+                    placeholder="e.g., A13, Office"
                   />
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-4 mt-8">
                 <button
-                  onClick={() => { 
-                    setShowModal(false); 
-                    setForm({ location: '', extension: '', username: '' }); 
-                    setEditingIndex(null); 
+                  onClick={() => {
+                    setShowModal(false);
+                    setForm({ location: '', extension: '', username: '' });
+                    setEditingIndex(null);
                   }}
-                  className="flex-1 px-4 py-3 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  className="flex-1 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all duration-200 font-semibold"
                   disabled={loading}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={editingIndex !== null ? handleUpdate : handleAdd}
-                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50"
                   disabled={loading}
                 >
-                  {loading ? 'Saving...' : 'Save'}
+                  {loading ? 'Saving...' : editingIndex !== null ? 'Update Employee' : 'Add Employee'}
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Footer */}
+        <footer className="mt-16 py-8 border-t border-slate-200">
+          <div className="text-center">
+            <p className="text-slate-500 text-sm">
+              © 2025 Rashmi Metaliks Limited. Developed by Arjun Tanotra.
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
+              Employee Directory System
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
   );

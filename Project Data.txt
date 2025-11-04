@@ -1,0 +1,11 @@
+IT 
+
+Issues 
+
+1. Data is not valid as there are some missing enteries 
+
+
+
+Addition Requirement
+
+1. Add bulk file directly to the database
