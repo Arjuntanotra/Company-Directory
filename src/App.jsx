@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2, Upload } from 'lucide-react';
+import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2, Upload, Filter, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 
@@ -15,7 +15,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
-  const [form, setForm] = useState({ location: '', extension: '', username: '' });
+  const [form, setForm] = useState({ location: '', extension: '', username: '', area: '' });
+  const [selectedAreas, setSelectedAreas] = useState([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [visibleItems, setVisibleItems] = useState(25); // Start with 25 items
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fileRef = useRef();
@@ -29,9 +31,11 @@ function App() {
       const result = await res.json();
       
       if (result.success) {
+        console.log('Fetched data:', result.data);
         const dataWithIndex = result.data.map((item, index) => ({ ...item, index }));
         setData(dataWithIndex);
       } else {
+        console.log('Failed to load data:', result.error);
         alert('Failed to load data: ' + result.error);
       }
     } catch (err) {
@@ -42,12 +46,19 @@ function App() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Filter data by search
-  const filtered = data.filter(e =>
-  String(e.username || '').toLowerCase().includes(search.toLowerCase()) ||
-  String(e.extension || '').toLowerCase().includes(search.toLowerCase()) ||
-  String(e.location || '').toLowerCase().includes(search.toLowerCase())
-);
+  // Filter data by search and areas
+  let filtered = data;
+  if (search) {
+    filtered = filtered.filter(e =>
+      String(e.username || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(e.extension || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(e.location || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(e.area || '').toLowerCase().includes(search.toLowerCase())
+    );
+  }
+  if (selectedAreas.length > 0) {
+    filtered = filtered.filter(e => selectedAreas.includes(e.area));
+  }
 
   // Reset visible items when search changes
   useEffect(() => {
@@ -113,6 +124,7 @@ function App() {
       formData.append('location', form.location);
       formData.append('extension', form.extension);
       formData.append('username', form.username);
+      formData.append('area', form.area);
 
       const res = await fetch(WEB_APP_URL, {
         method: 'POST',
@@ -123,7 +135,7 @@ function App() {
       if (result.success) {
         alert('Entry added successfully!');
         setShowModal(false);
-        setForm({ location: '', extension: '', username: '' });
+        setForm({ location: '', extension: '', username: '', area: '' });
         loadData();
       } else {
         alert('Failed to add entry: ' + result.error);
@@ -149,6 +161,7 @@ function App() {
       formData.append('location', form.location);
       formData.append('extension', form.extension);
       formData.append('username', form.username);
+      formData.append('area', form.area);
 
       const res = await fetch(WEB_APP_URL, {
         method: 'POST',
@@ -159,7 +172,7 @@ function App() {
       if (result.success) {
         alert('Entry updated successfully!');
         setShowModal(false);
-        setForm({ location: '', extension: '', username: '' });
+        setForm({ location: '', extension: '', username: '', area: '' });
         setEditingIndex(null);
         loadData();
       } else {
@@ -229,7 +242,8 @@ function App() {
         location: String(row.location || row.Location || row.loc || row.Loc || '').trim(),
         extension: String(row.extension || row.Extension || row.ext || row.Ext || row['Extension number'] || '').trim(),
         username: String(row.username || row.Username || row.name || row.Name || row.employee || row.Employee || row['User name'] || '').trim(),
-      })).filter(entry => entry.username && entry.extension); // Basic validation: require username and extension
+        area: String(row.area || row.Area || '').trim(),
+      })).filter(entry => entry.username && entry.extension); // Basic validation: require username, extension, area
 
       console.log('Original data rows:', jsonArray.length);
       console.log('Filtered valid rows:', filteredData.length);
@@ -271,6 +285,7 @@ function App() {
         formData.append('location', entry.location);
         formData.append('extension', entry.extension);
         formData.append('username', entry.username);
+        formData.append('area', entry.area);
 
         return fetch(WEB_APP_URL, { method: 'POST', body: formData })
           .then(res => res.json())
@@ -334,7 +349,6 @@ function App() {
                 <p className="text-emerald-800 font-semibold">
                   Administrative Access Enabled
                 </p>
-                <span className="text-emerald-600 text-sm">Full system management capabilities active</span>
               </div>
             </div>
           )}
@@ -342,20 +356,30 @@ function App() {
 
         {/* Search Bar */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 mb-8">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-slate-700 mb-3">Search Directory</label>
-              <div className="relative">
+            <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="flex-1 flex flex-col md:flex-row md:items-center md:gap-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-3 md:mb-0 md:mr-2">Search Directory</label>
+              <div className="relative flex-1 w-full">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={22} />
                 <input
                   type="text"
                   placeholder="Search employees by name, extension, or location..."
-                  className="w-full pl-12 pr-4 py-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-slate-800 placeholder-slate-400"
+                  className="w-full h-12 pl-12 pr-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-slate-800 placeholder-slate-400"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
             </div>
+            <div className="flex items-center">
+              <button
+                onClick={() => setShowFilterModal(prev => !prev)}
+                className="h-12 px-4 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all duration-200 flex items-center gap-2 justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
+              >
+                <Filter size={20} />
+                Filters
+              </button>
+            </div>
+          </div>
             {isAdmin && (
               <div className="flex flex-col sm:flex-row gap-4 lg:min-w-fit">
                 <button
@@ -364,14 +388,14 @@ function App() {
                     setEditingIndex(null);
                     setForm({ location: '', extension: '', username: '' });
                   }}
-                  className="px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
+                  className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm font-semibold"
                 >
                   <Plus size={20} />
                   Add Employee
                 </button>
                 <button
                   onClick={() => fileRef.current.click()}
-                  className="px-6 py-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-semibold"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm font-semibold"
                 >
                   <Upload size={20} />
                   Bulk Import
@@ -385,7 +409,48 @@ function App() {
                 />
               </div>
             )}
-          </div>
+          {showFilterModal && (
+            <div className="mt-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-800">Filters</h3>
+                <button onClick={() => setShowFilterModal(false)} className="text-slate-400 hover:text-slate-600">Close</button>
+              </div>
+              <div className="mb-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search filters..."
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    onChange={(e) => { /* filter logic for options */ }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Filter by Area</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                    {[...new Set(data.map(e => e.area).filter(Boolean))].sort().map(area => (
+                      <label key={area} className="flex items-center space-x-2">
+                        <input type="checkbox" checked={selectedAreas.includes(area)} onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedAreas([...selectedAreas, area]);
+                          } else {
+                            setSelectedAreas(selectedAreas.filter(a => a !== area));
+                          }
+                        }} />
+                        <span className="text-sm">{area}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => { setSelectedAreas([]); }} className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200 text-sm font-semibold">Clear All</button>
+                <button onClick={() => setShowFilterModal(false)} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-semibold">Apply</button>
+              </div>
+            </div>
+          )}
           <div className="mt-6 flex items-center justify-between text-sm">
             <div className="flex items-center gap-4">
               <span className="text-slate-600 font-medium">
@@ -409,57 +474,66 @@ function App() {
         {/* Employee Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {(search ? filtered : filtered.slice(0, visibleItems)).map((entry, idx) => (
-            <div key={idx} className="bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+            <div key={idx} className={`bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-2xl transition-all duration-300 group overflow-hidden ${isAdmin ? 'min-h-[400px]' : ''}`}>
               <div className="p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
                       {entry.username.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h3 className="font-bold text-xl text-slate-800 leading-tight">{entry.username}</h3>
-                      <p className="text-slate-500 font-medium">Employee</p>
+                      <h3 className="font-bold text-lg text-slate-800 leading-tight">{entry.username}</h3>
+                      <p className="text-slate-500 text-sm font-medium">Employee</p>
                     </div>
                   </div>
                   {isAdmin && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <button
                         onClick={() => openEdit(entry)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit Employee"
                       >
-                        <Edit2 size={18} />
+                        <Edit2 size={16} />
                       </button>
                       <button
                         onClick={() => handleDelete(entry.index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Remove Employee"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <a
                     href={`tel:${entry.extension}`}
                     className="block group/contact"
                   >
-                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200 cursor-pointer">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover/contact:bg-blue-200 transition-colors">
-                        <Phone size={20} className="text-blue-600" />
+                    <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200 cursor-pointer">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center group-hover/contact:bg-blue-200 transition-colors">
+                        <Phone size={18} className="text-blue-600" />
                       </div>
                       <div>
                         <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Extension</div>
-                        <div className="font-mono font-bold text-xl text-slate-800">{entry.extension}</div>
+                        <div className="font-mono font-bold text-lg text-slate-800">{entry.extension}</div>
                       </div>
                     </div>
                   </a>
+                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <MapPin size={18} className="text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Area</div>
+                      <div className="text-sm font-semibold text-slate-800">{entry.area || 'Not Specified'}</div>
+                    </div>
+                  </div>
                   {entry.location && (
-                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                        <MapPin size={20} className="text-emerald-600" />
+                    <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <MapPin size={18} className="text-emerald-600" />
                       </div>
                       <div>
                         <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Location</div>
@@ -545,6 +619,16 @@ function App() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">Area</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    value={form.area}
+                    onChange={(e) => setForm({ ...form, area: e.target.value })}
+                    placeholder="e.g., IT, HR"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">Location</label>
                   <input
                     type="text"
@@ -578,6 +662,8 @@ function App() {
             </div>
           </div>
         )}
+
+        
 
         {/* Footer */}
         <footer className="mt-16 py-8 border-t border-slate-200">
