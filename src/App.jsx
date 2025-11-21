@@ -3,7 +3,7 @@ import { Search, Phone, MapPin, Lock, Unlock, RefreshCw, Plus, Edit2, Trash2, Up
 import * as XLSX from 'xlsx';
 
 
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5SJm00xKHTIShxzrl7VKj4KadjtaInTM_T97JNiJTm7d6WJH68zd1Tt5k4x36W9Qg/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz15Axb66RnDkc55i2czAfLT-lkOPKjvCDzr1GO3nl2wWv6P3S6M2391sf4GhSPflg64A/exec';
 const ADMIN_PASSWORDS = process.env.REACT_APP_ADMIN_PASSWORDS
   ? process.env.REACT_APP_ADMIN_PASSWORDS.split(',')
   : [];
@@ -17,6 +17,7 @@ function App() {
   const [editingIndex, setEditingIndex] = useState(null);
   const [form, setForm] = useState({ location: '', extension: '', username: '', area: '' });
   const [selectedAreas, setSelectedAreas] = useState([]);
+  const [selectedLocations, setSelectedLocations] = useState([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [visibleItems, setVisibleItems] = useState(25); // Start with 25 items
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -59,11 +60,14 @@ function App() {
   if (selectedAreas.length > 0) {
     filtered = filtered.filter(e => selectedAreas.includes(e.area));
   }
+  if (selectedLocations.length > 0) {
+    filtered = filtered.filter(e => selectedLocations.includes(e.location));
+  }
 
-  // Reset visible items when search changes
+  // Reset visible items when search or filters change
   useEffect(() => {
     setVisibleItems(25);
-  }, [search]);
+  }, [search, selectedAreas, selectedLocations]);
 
   // Infinite scroll logic
   const loadMoreItems = useCallback(() => {
@@ -444,9 +448,26 @@ function App() {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Filter by Location</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                    {[...new Set(data.map(e => e.location).filter(Boolean))].sort().map(location => (
+                      <label key={location} className="flex items-center space-x-2">
+                        <input type="checkbox" checked={selectedLocations.includes(location)} onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLocations([...selectedLocations, location]);
+                          } else {
+                            setSelectedLocations(selectedLocations.filter(l => l !== location));
+                          }
+                        }} />
+                        <span className="text-sm">{location}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="flex gap-3 mt-4">
-                <button onClick={() => { setSelectedAreas([]); }} className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200 text-sm font-semibold">Clear All</button>
+                <button onClick={() => { setSelectedAreas([]); setSelectedLocations([]); }} className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200 text-sm font-semibold">Clear All</button>
                 <button onClick={() => setShowFilterModal(false)} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-semibold">Apply</button>
               </div>
             </div>
