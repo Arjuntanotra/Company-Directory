@@ -30,7 +30,7 @@ function App() {
     try {
       const res = await fetch(`${WEB_APP_URL}?action=read`);
       const result = await res.json();
-      
+
       if (result.success) {
         console.log('Fetched data:', result.data);
         const dataWithIndex = result.data.map((item, index) => ({ ...item, index }));
@@ -231,7 +231,7 @@ function App() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const data = evt.target.result;
-      const workbook = XLSX.read(data, {type: 'binary'});
+      const workbook = XLSX.read(data, { type: 'binary' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonArray = XLSX.utils.sheet_to_json(worksheet);
@@ -317,11 +317,11 @@ function App() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-2xl">R</span>
+                <img src="logo.jpeg" alt="Rashmi Metaliks Limited Logo" className="w-full h-full object-cover rounded-xl" />
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Rashmi Metaliks Limited</h1>
-                <p className="text-slate-600 text-lg font-medium">Employee Directory</p>
+                <p className="text-slate-600 text-lg font-medium">Intercom Directory</p>
                 <p className="text-slate-500 text-sm mt-1">Access to company contacts and extensions</p>
               </div>
             </div>
@@ -336,9 +336,8 @@ function App() {
               </button>
               <button
                 onClick={() => isAdmin ? setIsAdmin(false) : handleAdminLogin()}
-                className={`px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
-                  isAdmin ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-700 text-white hover:bg-slate-800'
-                }`}
+                className={`px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${isAdmin ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-700 text-white hover:bg-slate-800'
+                  }`}
               >
                 {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
                 {isAdmin ? 'Admin Active' : 'Admin Login'}
@@ -360,7 +359,7 @@ function App() {
 
         {/* Search Bar */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 mb-8">
-            <div className="flex flex-col md:flex-row md:items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
             <div className="flex-1 flex flex-col md:flex-row md:items-center md:gap-4">
               <label className="block text-sm font-semibold text-slate-700 mb-3 md:mb-0 md:mr-2">Search Directory</label>
               <div className="relative flex-1 w-full">
@@ -384,35 +383,35 @@ function App() {
               </button>
             </div>
           </div>
-            {isAdmin && (
-              <div className="flex flex-col sm:flex-row gap-4 lg:min-w-fit">
-                <button
-                  onClick={() => {
-                    setShowModal(true);
-                    setEditingIndex(null);
-                    setForm({ location: '', extension: '', username: '' });
-                  }}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm font-semibold"
-                >
-                  <Plus size={20} />
-                  Add Employee
-                </button>
-                <button
-                  onClick={() => fileRef.current.click()}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm font-semibold"
-                >
-                  <Upload size={20} />
-                  Bulk Import
-                </button>
-                <input
-                  type="file"
-                  ref={fileRef}
-                  style={{ display: 'none' }}
-                  onChange={handleFileUpload}
-                  accept=".xlsx,.xls,.csv"
-                />
-              </div>
-            )}
+          {isAdmin && (
+            <div className="flex flex-col sm:flex-row gap-4 lg:min-w-fit">
+              <button
+                onClick={() => {
+                  setShowModal(true);
+                  setEditingIndex(null);
+                  setForm({ location: '', extension: '', username: '' });
+                }}
+                className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm font-semibold"
+              >
+                <Plus size={20} />
+                Add Employee
+              </button>
+              <button
+                onClick={() => fileRef.current.click()}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm font-semibold"
+              >
+                <Upload size={20} />
+                Bulk Import
+              </button>
+              <input
+                type="file"
+                ref={fileRef}
+                style={{ display: 'none' }}
+                onChange={handleFileUpload}
+                accept=".xlsx,.xls,.csv"
+              />
+            </div>
+          )}
           {showFilterModal && (
             <div className="mt-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -684,7 +683,7 @@ function App() {
           </div>
         )}
 
-        
+
 
         {/* Footer */}
         <footer className="mt-16 py-8 border-t border-slate-200">
